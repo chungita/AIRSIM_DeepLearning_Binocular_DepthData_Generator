@@ -1,0 +1,4 @@
+drone
+fixed wing
+tree
+ground
