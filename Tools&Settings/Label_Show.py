@@ -66,7 +66,7 @@ script_dir = os.path.dirname(os.path.abspath(__file__))
 # 調整資料夾路徑以適應新的檔案結構 (your_script_name.py 在 Display 資料夾下，這些在上一層)
 yolo_folder = os.path.join(script_dir, "..","Results", "YOLO_Label")
 mot_folder = os.path.join(script_dir, "..", "Results", "MOT_Label")
-image_folder = os.path.join(script_dir, "..", "ProcessData")
+image_folder = os.path.join(script_dir, "..", "Results", "Img")
 classes_file = os.path.join(script_dir, "predefined_classes.txt")
 
 WINDOW_WIDTH = int(settings.get("image_width", 1024))

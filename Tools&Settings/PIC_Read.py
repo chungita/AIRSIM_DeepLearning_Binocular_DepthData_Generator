@@ -108,7 +108,10 @@ class ImageViewerWidget(QWidget):
         
         self.init_ui()
         # 初始化時設定一次佈局
-        self.figure.tight_layout()
+        try:
+            self.figure.tight_layout()
+        except:
+            pass  # 忽略 tight_layout 警告
         self.load_images()
         self.update_display()
         
@@ -135,6 +138,7 @@ class ImageViewerWidget(QWidget):
         # 更新按鈕文字
         self.prev_btn.setText(self.texts[self.current_language]["prev_image"])
         self.next_btn.setText(self.texts[self.current_language]["next_image"])
+        self.save_btn.setText(self.texts[self.current_language]["save_png"])
         self.type_switch_label.setText(self.texts[self.current_language]["type_switch"])
         self.pixel_value_label.setText(f"{self.texts[self.current_language]['pixel_value']} --")
         
@@ -159,12 +163,16 @@ class ImageViewerWidget(QWidget):
                 "type_switch": "類型切換: W/S",
                 "no_files": "沒有檔案",
                 "pixel_value": "像素值:",
+                "save_png": "💾 下載 PNG",
                 "no_files_found": "沒有找到 {type} 檔案",
                 "error": "錯誤",
                 "folder_not_found": "找不到資料夾: {folder}",
                 "unknown_type": "未知的圖片類型: {type}",
                 "unsupported_format": "不支援的檔案格式: {ext}",
-                "processing_error": "處理檔案時發生錯誤:\n檔案: {file}\n錯誤: {error}"
+                "processing_error": "處理檔案時發生錯誤:\n檔案: {file}\n錯誤: {error}",
+                "save_success": "圖片已儲存到: {path}",
+                "save_error": "儲存失敗: {error}",
+                "no_image": "沒有可儲存的圖片"
             },
             "en": {
                 "image_type": "Image Type:",
@@ -173,12 +181,16 @@ class ImageViewerWidget(QWidget):
                 "type_switch": "Type Switch: W/S",
                 "no_files": "No Files",
                 "pixel_value": "Pixel Value:",
+                "save_png": "💾 Save PNG",
                 "no_files_found": "No {type} files found",
                 "error": "Error",
                 "folder_not_found": "Folder not found: {folder}",
                 "unknown_type": "Unknown image type: {type}",
                 "unsupported_format": "Unsupported file format: {ext}",
-                "processing_error": "Error processing file:\nFile: {file}\nError: {error}"
+                "processing_error": "Error processing file:\nFile: {file}\nError: {error}",
+                "save_success": "Image saved to: {path}",
+                "save_error": "Save failed: {error}",
+                "no_image": "No image to save"
             }
         }
         
@@ -203,6 +215,26 @@ class ImageViewerWidget(QWidget):
         self.next_btn = QPushButton(self.texts[self.current_language]["next_image"])
         self.next_btn.clicked.connect(self.next_image)
         self.control_layout.addWidget(self.next_btn)
+        
+        # 添加下載 PNG 按鈕
+        self.save_btn = QPushButton(self.texts[self.current_language]["save_png"])
+        self.save_btn.clicked.connect(self.save_as_png)
+        self.save_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #27ae60;
+                color: white;
+                font-weight: bold;
+                padding: 5px 10px;
+                border-radius: 3px;
+            }
+            QPushButton:hover {
+                background-color: #229954;
+            }
+            QPushButton:pressed {
+                background-color: #1e8449;
+            }
+        """)
+        self.control_layout.addWidget(self.save_btn)
         
         self.type_switch_label = QLabel(self.texts[self.current_language]["type_switch"])
         self.control_layout.addWidget(self.type_switch_label)
@@ -462,6 +494,10 @@ class ImageViewerWidget(QWidget):
             self.ax.set_xlabel('Pixel X')
             self.ax.set_ylabel('Pixel Y')
             
+            # 去掉 xy 軸的刻度
+            self.ax.set_xticks([])
+            self.ax.set_yticks([])
+            
             self.status_label.setText(f"{filename} ({self.current_index + 1}/{len(self.image_files)})")
             
             self.canvas.draw()
@@ -491,6 +527,80 @@ class ImageViewerWidget(QWidget):
         if self.current_index < len(self.image_files) - 1:
             self.current_index += 1
             self.update_display()
+    
+    def save_as_png(self):
+        """
+        將當前顯示的圖片保存為 PNG 格式
+        """
+        if self.current_data is None or not self.image_files:
+            QMessageBox.warning(self, self.texts[self.current_language]["error"], 
+                              self.texts[self.current_language]["no_image"])
+            return
+        
+        try:
+            from PyQt5.QtWidgets import QFileDialog
+            
+            # 獲取當前文件名（去除副檔名）
+            current_file = self.image_files[self.current_index]
+            base_name = os.path.splitext(os.path.basename(current_file))[0]
+            
+            # 預設保存路徑
+            default_save_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "Results")
+            if not os.path.exists(default_save_path):
+                default_save_path = os.path.dirname(current_file)
+            
+            # 打開保存對話框
+            save_path, _ = QFileDialog.getSaveFileName(
+                self,
+                "Save as PNG" if self.current_language == "en" else "儲存為 PNG",
+                os.path.join(default_save_path, f"{base_name}.png"),
+                "PNG Files (*.png);;All Files (*.*)"
+            )
+            
+            if not save_path:
+                return  # 用戶取消
+            
+            # 確保副檔名為 .png
+            if not save_path.lower().endswith('.png'):
+                save_path += '.png'
+            
+            # 保存圖片
+            data_to_save = self.current_data.copy()
+            
+            # 如果是 PFM 文件（深度圖或視差圖），需要進行歸一化處理
+            if self.image_files[self.current_index].lower().endswith('.pfm'):
+                # 處理無限值和 NaN
+                data_to_save = np.nan_to_num(data_to_save, nan=0, posinf=0, neginf=0)
+                
+                # 歸一化到 0-255
+                min_val, max_val = find_min_max_no_inf(self.current_data)
+                if min_val is not None and max_val is not None and max_val > min_val:
+                    # 對深度圖限制最大顯示值
+                    if os.path.basename(self.image_files[self.current_index]).lower().startswith("depth"):
+                        visual_max = min(max_val, 150)
+                        data_to_save = np.clip(data_to_save, 0, visual_max)
+                        data_to_save = ((data_to_save - min_val) / (visual_max - min_val) * 255).astype(np.uint8)
+                    else:
+                        data_to_save = ((data_to_save - min_val) / (max_val - min_val) * 255).astype(np.uint8)
+                    
+                    # 應用 colormap
+                    import matplotlib.cm as cm
+                    cmap = cm.get_cmap('jet')
+                    data_to_save = (cmap(data_to_save / 255.0)[:, :, :3] * 255).astype(np.uint8)
+                else:
+                    data_to_save = (data_to_save * 255).astype(np.uint8)
+            
+            # 保存為 PNG
+            img = Image.fromarray(data_to_save)
+            img.save(save_path)
+            
+            # 顯示成功訊息
+            QMessageBox.information(self, "Success" if self.current_language == "en" else "成功", 
+                                  self.texts[self.current_language]["save_success"].format(path=save_path))
+            
+        except Exception as e:
+            QMessageBox.critical(self, self.texts[self.current_language]["error"], 
+                               self.texts[self.current_language]["save_error"].format(error=str(e)))
             
 class MainWindow(QMainWindow):
     def __init__(self):

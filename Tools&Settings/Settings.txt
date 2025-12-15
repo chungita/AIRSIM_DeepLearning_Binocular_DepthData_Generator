@@ -26,10 +26,10 @@ Threshold:30
 
 #PIC_Reader
 PIC_Img_read:Depth,Disparity,Img0,Img1
-Pic_Input_folder:ProcessData
+Pic_Input_folder:Results/Img
 
 #gifer
-GIF_Input_folder:ProcessData
+GIF_Input_folder:Results/Img
 GIF_MOT_folder:Results/MOT_Label
 GIF_YOLO_folder:Results/YOLO_Label
 Frame_Length:180
@@ -39,7 +39,7 @@ default_FPS:15
 Track_Input_folder:Results/MOT_Label
 
 #Video_Convertor
-Video_Input_folder:ProcessData
+Video_Input_folder:Results/Img
 Video_Output_folder:Results
 Video_YOLO_Label:Results/YOLO_Label
 Video_MOT_Label:Results/MOT_Label
