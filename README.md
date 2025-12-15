@@ -67,10 +67,21 @@ python Control_Panel.py
 
 Before processing data:
 
-1. **Configure AirSim**: Use the sample configuration from `Airsim settings/settings.json` as a reference for your AirSim setup
-2. **Collect Data**: Run your AirSim simulation to collect raw data
-3. **Prepare Data**: Copy your AirSim simulation data to the `RawData/` folder
-4. **Configure Processing**: Adjust parameters in `Tools&Settings/Settings.txt` according to your camera setup
+1. **Configure AirSim Settings**:
+   - Copy the sample configuration file to your AirSim directory:
+     ```bash
+     # Windows: Copy to Documents folder
+     copy "Airsim settings\settings.json" "%USERPROFILE%\Documents\AirSim\settings.json"
+     ```
+   - Or manually copy `Airsim settings/settings.json` to your AirSim settings directory
+   - Location: `C:\Users\[YourUsername]\Documents\AirSim\settings.json`
+   - **Important**: You must swap/replace the AirSim settings file with the one provided in this project before running simulations
+
+2. **Collect Data**: Run your AirSim simulation in UE4 to collect raw data
+
+3. **Prepare Data**: Copy your AirSim simulation output data to the `RawData/` folder
+
+4. **Configure Processing**: Adjust parameters in `Tools&Settings/Settings.txt` according to your camera setup and data paths
 
 ## 📋 Tools Overview
 
@@ -148,22 +159,30 @@ DataGenerator/
 
 ### Recommended Processing Order:
 
-1. **Prepare Raw Data**: Place AirSim data in the `RawData/` folder. You can also use the sample configuration from the `Airsim settings/` folder
-2. **Check Settings**: Verify parameters in `Settings.txt` (camera parameters, paths, etc.)
-3. **Run Data Generator**: Process raw data and generate depth/disparity maps
-4. **Annotate Images**: Use manual or automatic mode to label objects
-5. **Verify Results**: Use viewers to confirm annotation quality
-6. **Generate Output**: Export labels and create demo animations
+1. **Setup AirSim Settings**: Copy `Airsim settings/settings.json` to your AirSim directory (`Documents/AirSim/settings.json`)
+2. **Run Simulation**: Launch UE4 with AirSim and collect simulation data
+3. **Prepare Raw Data**: Copy collected AirSim data to the `RawData/` folder
+4. **Check Processing Settings**: Verify parameters in `Tools&Settings/Settings.txt` (camera parameters, paths, etc.)
+5. **Run Data Generator**: Process raw data and generate depth/disparity maps
+6. **Annotate Images**: Use manual or automatic mode to label objects
+7. **Verify Results**: Use viewers to confirm annotation quality
+8. **Generate Output**: Export labels and create demo animations
 
 ## ⚙️ Configuration
 
 ### AirSim Configuration
 
-The `Airsim settings/settings.json` file contains sample AirSim configuration:
-- Camera sensor settings
-- Stereo camera setup
-- Image capture settings
-- Use this as a reference when configuring your AirSim environment
+The `Airsim settings/settings.json` file contains optimized AirSim configuration for this toolkit:
+- **Stereo camera setup** with proper baseline and focal length
+- **Depth and segmentation sensors** configuration
+- **Image capture settings** for optimal data collection
+- **Must be copied** to your AirSim directory before running simulations
+
+**Setup Steps**:
+1. Backup your existing AirSim settings (if any)
+2. Copy `Airsim settings/settings.json` to `Documents/AirSim/settings.json`
+3. Restart UE4/AirSim to apply the new settings
+4. The toolkit's processing tools are calibrated to work with these camera parameters
 
 ### Processing Configuration
 
@@ -218,7 +237,10 @@ Includes 3D coordinates from depth information
 - **File Not Found**: Check that paths in `Settings.txt` are correct
 - **GUI Not Displaying**: Verify PyQt5 installation: `pip install PyQt5`
 - **Depth Map Errors**: Ensure .pfm files are valid and not corrupted
+- **Incorrect Depth Values**: Make sure you copied `Airsim settings/settings.json` to your AirSim directory before data collection
+- **Missing Camera Images**: Verify that the AirSim settings file includes stereo camera configuration
 - **No Data to Process**: Verify that AirSim simulation has been run and data has been collected
+- **Processing Results Incorrect**: Check that your AirSim settings match the provided settings.json file
 - **AirSim Configuration Issues**: Refer to the [AirSim documentation](https://microsoft.github.io/AirSim/) for setup help
 
 ## 📄 License
@@ -247,8 +269,9 @@ For questions or support, please open an issue in the [repository](https://githu
 
 - **AirSim Dependency**: This toolkit is specifically designed to process data collected from AirSim simulations running in Unreal Engine 4
 - **Pre-requisites**: You must have UE4 and AirSim installed and configured before using this data processing toolkit
+- **⚠️ Critical - Settings File**: You **MUST** copy `Airsim settings/settings.json` to your AirSim directory (`Documents/AirSim/settings.json`) before running simulations. The processing tools rely on specific camera configurations defined in this file
 - **Data Source**: The toolkit processes simulation data from AirSim, not real-world data
-- **Configuration**: Use the sample settings in `Airsim settings/settings.json` as a reference when setting up your AirSim environment
+- **Camera Calibration**: The depth calculation and stereo processing are calibrated to work with the camera parameters in the provided settings.json file
 
 For more information about AirSim setup and usage, visit the [official AirSim documentation](https://microsoft.github.io/AirSim/).
 
