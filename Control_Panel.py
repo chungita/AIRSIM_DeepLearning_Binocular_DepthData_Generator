@@ -8,24 +8,38 @@ from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QFont, QIcon, QPainter, QColor
 
 class ProcessWindow(QDialog):
-    """流程顯示視窗 - 不在終端機顯示任何內容"""
-    def __init__(self, parent=None):
+    """Process display window - no console output"""
+    def __init__(self, parent=None, language="zh"):
         super().__init__(parent)
-        self.setWindowTitle("AirSim 資料處理流程")
+        self.language = language
+        
+        # Multi-language window titles
+        self.titles = {
+            "zh": "AirSim 資料處理流程",
+            "en": "AirSim Data Processing Workflow"
+        }
+        
+        self.setWindowTitle(self.titles[self.language])
         self.setGeometry(200, 200, 700, 500)
-        self.setModal(False)  # 非模態視窗
+        self.setModal(False)  # Non-modal window
         
         self.init_ui()
         
     def init_ui(self):
         layout = QVBoxLayout(self)
         
-        # 標題
-        title_label = QLabel("🚀 AirSim 資料處理工具集")
-        title_label.setAlignment(Qt.AlignCenter)
+        # Multi-language titles
+        self.label_titles = {
+            "zh": "🚀 AirSim 資料處理工具集",
+            "en": "🚀 AirSim Data Processing Toolkit"
+        }
+        
+        # Title
+        self.title_label = QLabel(self.label_titles[self.language])
+        self.title_label.setAlignment(Qt.AlignCenter)
         title_font = QFont("Microsoft YaHei", 16, QFont.Bold)
-        title_label.setFont(title_font)
-        title_label.setStyleSheet("""
+        self.title_label.setFont(title_font)
+        self.title_label.setStyleSheet("""
             QLabel {
                 color: #2c3e50;
                 margin: 15px;
@@ -35,9 +49,9 @@ class ProcessWindow(QDialog):
                 border: 2px solid #3498db;
             }
         """)
-        layout.addWidget(title_label)
+        layout.addWidget(self.title_label)
         
-        # 流程文字顯示區域
+        # Process text display area
         self.process_text = QTextEdit()
         self.process_text.setReadOnly(True)
         self.process_text.setStyleSheet("""
@@ -53,33 +67,57 @@ class ProcessWindow(QDialog):
         """)
         layout.addWidget(self.process_text)
         
-        # 底部按鈕區域
+        # Bottom button area
         button_layout = QHBoxLayout()
         
-        refresh_btn = QPushButton("🔄 重新整理")
-        refresh_btn.clicked.connect(self.refresh_process_info)
-        refresh_btn.setStyleSheet(self.get_button_style("#3498db"))
+        # Multi-language button texts
+        self.button_texts = {
+            "zh": {
+                "refresh": "🔄 重新整理",
+                "clear": "🗑️ 清空日誌",
+                "close": "❌ 關閉"
+            },
+            "en": {
+                "refresh": "🔄 Refresh",
+                "clear": "🗑️ Clear Log",
+                "close": "❌ Close"
+            }
+        }
         
-        clear_btn = QPushButton("🗑️ 清空日誌")
-        clear_btn.clicked.connect(self.clear_log)
-        clear_btn.setStyleSheet(self.get_button_style("#95a5a6"))
+        self.refresh_btn = QPushButton(self.button_texts[self.language]["refresh"])
+        self.refresh_btn.clicked.connect(self.refresh_process_info)
+        self.refresh_btn.setStyleSheet(self.get_button_style("#3498db"))
         
-        close_btn = QPushButton("❌ 關閉")
-        close_btn.clicked.connect(self.close)
-        close_btn.setStyleSheet(self.get_button_style("#e74c3c"))
+        self.clear_btn = QPushButton(self.button_texts[self.language]["clear"])
+        self.clear_btn.clicked.connect(self.clear_log)
+        self.clear_btn.setStyleSheet(self.get_button_style("#95a5a6"))
         
-        button_layout.addWidget(refresh_btn)
-        button_layout.addWidget(clear_btn)
+        self.close_btn = QPushButton(self.button_texts[self.language]["close"])
+        self.close_btn.clicked.connect(self.close)
+        self.close_btn.setStyleSheet(self.get_button_style("#e74c3c"))
+        
+        button_layout.addWidget(self.refresh_btn)
+        button_layout.addWidget(self.clear_btn)
         button_layout.addStretch()
-        button_layout.addWidget(close_btn)
+        button_layout.addWidget(self.close_btn)
         
         layout.addLayout(button_layout)
         
-        # 初始化顯示流程說明
+        # Initialize and display process guide
+        self.show_process_info()
+    
+    def update_language(self, language):
+        """Update window language"""
+        self.language = language
+        self.setWindowTitle(self.titles[self.language])
+        self.title_label.setText(self.label_titles[self.language])
+        self.refresh_btn.setText(self.button_texts[self.language]["refresh"])
+        self.clear_btn.setText(self.button_texts[self.language]["clear"])
+        self.close_btn.setText(self.button_texts[self.language]["close"])
         self.show_process_info()
         
     def get_button_style(self, color):
-        """按鈕樣式"""
+        """Button style"""
         return f"""
             QPushButton {{
                 background-color: {color};
@@ -101,20 +139,20 @@ class ProcessWindow(QDialog):
         """
         
     def darken_color(self, color, factor=0.85):
-        """將顏色變暗"""
-        if factor == 0.7:  # 更亮的邊框顏色
+        """Darken color"""
+        if factor == 0.7:  # Brighter border color
             color_map = {
                 "#3498db": "#5dade2",
                 "#95a5a6": "#aab7b8", 
                 "#e74c3c": "#ec7063"
             }
-        elif factor == 0.8:  # 按下時的顏色
+        elif factor == 0.8:  # Color when pressed
             color_map = {
                 "#3498db": "#2471a3",
                 "#95a5a6": "#717d7e", 
                 "#e74c3c": "#a93226"
             }
-        else:  # 預設 hover 顏色
+        else:  # Default hover color
             color_map = {
                 "#3498db": "#2980b9",
                 "#95a5a6": "#7f8c8d", 
@@ -123,8 +161,8 @@ class ProcessWindow(QDialog):
         return color_map.get(color, color)
         
     def show_process_info(self):
-        """顯示處理流程資訊"""
-        process_info = """
+        """Display process flow information"""
+        process_info_zh = """
 ═══════════════════════════════════════════════════════════════════════════════════
 
 🎯 AirSim 資料處理完整流程指南
@@ -194,33 +232,107 @@ class ProcessWindow(QDialog):
 
 ═══════════════════════════════════════════════════════════════════════════════════
         """
+        
+        process_info_en = """
+═══════════════════════════════════════════════════════════════════════════════════
+
+🎯 AirSim Data Processing Complete Workflow Guide
+
+═══════════════════════════════════════════════════════════════════════════════════
+
+📋 Processing Steps Overview:
+
+┌────────────────────────────────────────────────────────────────────────────────┐
+│ 1️⃣ Data Generator (DataGenerator.py)                                            │
+│    ├─ 🔄 Process AirSim raw data                                               │
+│    ├─ 🖼️ Generate depth maps (DepthGT_*.pfm)                                   │
+│    ├─ 📊 Generate disparity maps (Disparity_*.pfm)                             │
+│    ├─ 📁 Organize left/right camera images (Img0_*, Img1_*)                    │
+│    ├─ 🎨 Process semantic segmentation images (Seg_*)                          │
+│    └─ 📤 Copy results to output folder                                         │
+│                                                                                │
+│ 2️⃣ Image Labeler (Img_Labeler.py)                                              │
+│    ├─ ✏️ Manual annotation mode: draw bounding boxes manually                  │
+│    ├─ 🤖 Batch annotation mode: automatic color-based detection               │
+│    ├─ 📝 Generate YOLO format label files                                      │
+│    ├─ 🎯 Generate MOT format labels (with 3D coordinates)                      │
+│    └─ 💾 Save annotation results and statistics                                │
+│                                                                                │
+│ 3️⃣ View & Verification Tools                                                    │
+│    ├─ 🔍 Image Viewer (PIC_Read.py): view various image types                 │
+│    ├─ 🏷️ Label Viewer (Label_Show.py): verify annotation results              │
+│    └─ 📈 Track Analyzer (Track.py): display object trajectories               │
+│                                                                                │
+│ 4️⃣ Output & Presentation                                                        │
+│    └─ 🎬 GIF Generator (gifer.py): create animation demos                     │
+└────────────────────────────────────────────────────────────────────────────────┘
+
+🔧 Recommended Processing Order:
+
+1. 📂 Prepare raw data: Place AirSim data in RawData folder
+2. ⚙️ Check settings: Verify parameters in Settings.txt
+3. 🚀 Run data generator: Process raw data and generate depth/disparity maps
+4. 🎨 Run image labeler: Manually or automatically annotate objects
+5. ✅ View verification results: Use various viewers to confirm quality
+6. 📊 Generate final output: Export labels and create demo animations
+
+📁 Important Folder Structure:
+
+• RawData/           ← Raw AirSim data
+• ProcessData/       ← Processed images and depth data
+• Results/
+  ├─ Img/           ← Final image output
+  ├─ YOLO_Label/    ← YOLO format label files
+  └─ MOT_Label/     ← MOT format label files
+
+⚙️ Important Configuration Files:
+
+• Settings.txt       ← Main settings (camera parameters, paths, etc.)
+• predefined_classes.txt ← Predefined object classes
+
+💡 Usage Tips:
+
+• If depth map display is abnormal, check MaxDepth setting
+• If annotation results are poor, adjust color threshold parameters
+• Test with small range before batch processing
+• Regularly backup important annotation results
+
+═══════════════════════════════════════════════════════════════════════════════════
+
+✨ System Status: Ready to start processing!
+
+═══════════════════════════════════════════════════════════════════════════════════
+        """
+        
+        process_info = process_info_zh if self.language == "zh" else process_info_en
         self.process_text.setPlainText(process_info)
         
     def add_log(self, message):
-        """添加日誌訊息（不顯示在終端機）"""
+        """Add log message (no console output)"""
         from datetime import datetime
         timestamp = datetime.now().strftime("%H:%M:%S")
         log_message = f"[{timestamp}] {message}"
         
-        # 添加到文字區域的底部
+        # Add to bottom of text area
         self.process_text.append(log_message)
         
-        # 自動滾動到底部
+        # Auto-scroll to bottom
         scrollbar = self.process_text.verticalScrollBar()
         scrollbar.setValue(scrollbar.maximum())
         
     def clear_log(self):
-        """清空日誌並重新顯示流程資訊"""
+        """Clear log and redisplay process information"""
         self.process_text.clear()
         self.show_process_info()
         
     def refresh_process_info(self):
-        """重新整理流程資訊"""
+        """Refresh process information"""
         self.clear_log()
-        self.add_log("🔄 流程資訊已重新整理")
+        refresh_msg = "🔄 流程資訊已重新整理" if self.language == "zh" else "🔄 Process information refreshed"
+        self.add_log(refresh_msg)
 
 class ProgramButton(QPushButton):
-    """自定義程式按鈕，支援不同字體大小"""
+    """Custom program button with different font sizes"""
     def __init__(self, name, description, language="zh", parent=None):
         super().__init__(parent)
         self.name = name
@@ -246,40 +358,40 @@ class ProgramButton(QPushButton):
         """)
     
     def paintEvent(self, event):
-        """自定義繪製事件"""
+        """Custom paint event"""
         try:
             super().paintEvent(event)
             painter = QPainter(self)
             painter.setRenderHint(QPainter.Antialiasing)
             
-            # 根據語言設定字體大小
+            # Set font size based on language
             if self.language == "en":
-                # 英文版：14px 粗體
+                # English version: 14px bold
                 title_font = QFont("Arial", 14, QFont.Bold)
                 desc_font = QFont("Arial", 8, QFont.Normal)
             else:
-                # 中文版：18px 粗體
+                # Chinese version: 18px bold
                 title_font = QFont("Arial", 18, QFont.Bold)
                 desc_font = QFont("Arial", 8, QFont.Normal)
             
-            # 設定程式名稱字體
+            # Set program name font
             painter.setFont(title_font)
             painter.setPen(QColor(255, 255, 255))
             
-            # 繪製程式名稱
+            # Draw program name
             title_rect = self.rect().adjusted(10, 10, -10, -40)
             painter.drawText(title_rect, Qt.AlignCenter, self.name)
             
-            # 設定描述文字字體
+            # Set description text font
             painter.setFont(desc_font)
             
-            # 繪製描述文字
+            # Draw description text
             if self.language == "en":
-                # 英文版：分兩段顯示
+                # English version: display in two lines
                 desc_rect1 = self.rect().adjusted(10, 45, -10, -25)
                 desc_rect2 = self.rect().adjusted(10, 60, -10, -10)
                 
-                # 將描述文字分為兩段
+                # Split description into two lines
                 words = self.description.split()
                 if len(words) > 5:
                     mid = len(words) // 2
@@ -290,24 +402,24 @@ class ProgramButton(QPushButton):
                 else:
                     painter.drawText(desc_rect1, Qt.AlignCenter, self.description)
             else:
-                # 中文版：單行顯示
+                # Chinese version: single line display
                 desc_rect = self.rect().adjusted(10, 50, -10, -10)
                 painter.drawText(desc_rect, Qt.AlignCenter, self.description)
                 
         except Exception as e:
-            print(f"繪製按鈕時發生錯誤: {e}")
-            # 如果繪製失敗，使用預設文字顯示
+            print(f"Error drawing button: {e}")
+            # If drawing fails, use default text display
             super().paintEvent(event)
 
 class ControlPanel(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.current_language = "zh"  # 預設中文
+        self.current_language = "zh"  # Default Chinese
         self.setWindowTitle("資料處理工具集")
         self.setGeometry(100, 100, 650, 700)
-        self.setFixedSize(650, 700)  # 設定固定大小，無法調整
+        self.setFixedSize(650, 700)  # Set fixed size, cannot be resized
         
-        # 多語言文字
+        # Multi-language text
         self.texts = {
             "zh": {
                 "title": "資料處理工具集",
@@ -349,7 +461,7 @@ class ControlPanel(QMainWindow):
             }
         }
         
-        # 設定程式列表
+        # Set program list
         self.programs = {
             "zh": {
                 "資料生成器": {
@@ -413,7 +525,7 @@ class ControlPanel(QMainWindow):
             }
         }
         
-        # 初始化流程視窗
+        # Initialize process window
         self.process_window = None
         
         self.init_ui()
@@ -425,7 +537,7 @@ class ControlPanel(QMainWindow):
         layout = QVBoxLayout(central_widget)
         layout.setAlignment(Qt.AlignCenter)
         
-        # 標題
+        # Title
         self.title_label = QLabel(self.texts[self.current_language]["title"])
         self.title_label.setAlignment(Qt.AlignCenter)
         title_font = QFont("Arial", 20, QFont.Bold)
@@ -433,19 +545,19 @@ class ControlPanel(QMainWindow):
         self.title_label.setStyleSheet("color: #2c3e50; margin: 20px; font-weight: bold;")
         layout.addWidget(self.title_label)
         
-        # 說明文字
+        # Instruction text
         self.info_label = QLabel(self.texts[self.current_language]["select_tool"])
         self.info_label.setAlignment(Qt.AlignCenter)
         self.info_label.setStyleSheet("color: #34495e; margin-bottom: 20px; font-size: 16px; font-weight: bold;")
         layout.addWidget(self.info_label)
         
-        # 程式按鈕區域
+        # Program button area
         buttons_widget = QWidget()
         buttons_layout = QGridLayout(buttons_widget)
         buttons_layout.setSpacing(15)
         buttons_layout.setAlignment(Qt.AlignCenter)
         
-        # 創建程式按鈕
+        # Create program buttons
         self.program_buttons = {}
         row = 0
         col = 0
@@ -455,13 +567,13 @@ class ControlPanel(QMainWindow):
             buttons_layout.addWidget(button, row, col)
             
             col += 1
-            if col >= 2:  # 每行兩個按鈕
+            if col >= 2:  # Two buttons per row
                 col = 0
                 row += 1
                 
         layout.addWidget(buttons_widget)
         
-        # 底部工具按鈕
+        # Bottom tool buttons
         bottom_layout = QHBoxLayout()
         bottom_layout.setAlignment(Qt.AlignCenter)
         
@@ -490,16 +602,16 @@ class ControlPanel(QMainWindow):
         layout.addStretch()
         
     def create_program_button(self, name, info):
-        """創建程式啟動按鈕"""
+        """Create program launch button"""
         button = ProgramButton(name, info['description'], self.current_language)
         
-        # 連接點擊事件
+        # Connect click event
         button.clicked.connect(lambda: self.launch_program(name, info['file']))
         
         return button
         
     def get_program_button_style(self):
-        """程式按鈕樣式"""
+        """Program button style"""
         return """
             QPushButton {
                 background-color: #3498db;
@@ -521,7 +633,7 @@ class ControlPanel(QMainWindow):
         """
         
     def get_tool_button_style(self):
-        """工具按鈕樣式"""
+        """Tool button style"""
         return """
             QPushButton {
                 background-color: #95a5a6;
@@ -542,17 +654,17 @@ class ControlPanel(QMainWindow):
         
         
     def launch_program(self, name, file_path):
-        """啟動指定程式"""
+        """Launch specified program"""
         try:
             if not os.path.exists(file_path):
                 QMessageBox.critical(self, "錯誤", f"找不到程式檔案：{file_path}")
                 return
                 
-            # 設定環境變數傳遞語言設定
+            # Set environment variable to pass language setting
             env = os.environ.copy()
             env['AIRSIM_LANGUAGE'] = self.current_language
             
-            # 使用 subprocess 啟動程式
+            # Launch program using subprocess
             if sys.platform == "win32":
                 subprocess.Popen([sys.executable, file_path], 
                                creationflags=subprocess.CREATE_NO_WINDOW,
@@ -560,31 +672,34 @@ class ControlPanel(QMainWindow):
             else:
                 subprocess.Popen([sys.executable, file_path], env=env)
             
-            # 記錄啟動事件到流程視窗（不在終端機顯示）
+            # Log launch event to process window (no console output)
             if self.process_window:
                 self.process_window.add_log(f"🚀 已啟動程式：{name}")
             
-            # 移除成功提示對話框，改為靜默啟動
+            # Remove success dialog, use silent launch instead
             
         except Exception as e:
             QMessageBox.critical(self, "啟動失敗", f"無法啟動 {name}：\n{str(e)}")
             
     def show_process_window(self):
-        """顯示流程說明視窗（不在終端機顯示）"""
+        """Display process guide window (no console output)"""
         try:
             if self.process_window is None:
-                self.process_window = ProcessWindow(self)
+                self.process_window = ProcessWindow(self, self.current_language)
+            else:
+                # Update language if window already exists
+                self.process_window.update_language(self.current_language)
             
-            # 顯示視窗
+            # Show window
             self.process_window.show()
-            self.process_window.raise_()  # 提到最前面
-            self.process_window.activateWindow()  # 激活視窗
+            self.process_window.raise_()  # Bring to front
+            self.process_window.activateWindow()  # Activate window
             
-            # 在流程視窗中記錄開啟事件（不在終端機顯示）
+            # Log open event in process window (no console output)
             self.process_window.add_log("📋 流程說明視窗已開啟")
             
         except Exception as e:
-            # 只在有錯誤時顯示訊息框，不在終端機顯示
+            # Only show message box on error, no console output
             QMessageBox.warning(self, "警告", f"無法開啟流程視窗：{str(e)}")
             
     def open_settings(self):
@@ -596,11 +711,11 @@ class ControlPanel(QMainWindow):
                                    f"找不到設定編輯器 / Settings editor not found:\n{settings_editor_path}")
                 return
                 
-            # 設定環境變數傳遞語言設定
+            # Set environment variable to pass language setting
             env = os.environ.copy()
             env['AIRSIM_LANGUAGE'] = self.current_language
             
-            # 使用 subprocess 啟動設定編輯器
+            # Launch settings editor using subprocess
             if sys.platform == "win32":
                 subprocess.Popen([sys.executable, settings_editor_path], 
                                creationflags=subprocess.CREATE_NO_WINDOW,
@@ -608,7 +723,7 @@ class ControlPanel(QMainWindow):
             else:
                 subprocess.Popen([sys.executable, settings_editor_path], env=env)
             
-            # 記錄啟動事件到流程視窗
+            # Log launch event to process window
             if self.process_window:
                 self.process_window.add_log("⚙️ 已啟動設定編輯器 / Settings editor launched")
             
@@ -617,7 +732,7 @@ class ControlPanel(QMainWindow):
                                f"無法啟動設定編輯器 / Failed to launch settings editor:\n{str(e)}")
             
     def open_folder(self):
-        """開啟當前資料夾"""
+        """Open current folder"""
         try:
             current_dir = os.getcwd()
             if sys.platform == "win32":
@@ -628,40 +743,44 @@ class ControlPanel(QMainWindow):
             QMessageBox.critical(self, "錯誤", f"無法開啟資料夾：\n{str(e)}")
     
     def toggle_language(self):
-        """切換語言"""
-        # 切換語言
+        """Toggle language"""
+        # Toggle language
         if self.current_language == "zh":
             self.current_language = "en"
         else:
             self.current_language = "zh"
         
-        # 更新界面文字
+        # Update UI text
         self.setWindowTitle(self.texts[self.current_language]["title"])
         self.title_label.setText(self.texts[self.current_language]["title"])
         self.info_label.setText(self.texts[self.current_language]["select_tool"])
         
-        # 更新按鈕文字
+        # Update button text
         self.process_btn.setText(self.texts[self.current_language]["process_guide"])
         self.settings_btn.setText(self.texts[self.current_language]["edit_settings"])
         self.folder_btn.setText(self.texts[self.current_language]["open_folder"])
         self.language_btn.setText(self.texts[self.current_language]["language"])
         
-        # 重新創建程式按鈕
+        # Recreate program buttons
         self.recreate_program_buttons()
+        
+        # Update process window language if it exists
+        if self.process_window is not None:
+            self.process_window.update_language(self.current_language)
     
     def recreate_program_buttons(self):
-        """重新創建程式按鈕"""
-        # 清除現有按鈕
+        """Recreate program buttons"""
+        # Clear existing buttons
         for button in self.program_buttons.values():
             button.deleteLater()
         self.program_buttons.clear()
         
-        # 找到按鈕區域的布局
+        # Find button area layout
         central_widget = self.centralWidget()
         if central_widget:
             main_layout = central_widget.layout()
             if main_layout:
-                # 找到按鈕區域的 widget
+                # Find button area widget
                 for i in range(main_layout.count()):
                     item = main_layout.itemAt(i)
                     if item and item.widget():
@@ -669,13 +788,13 @@ class ControlPanel(QMainWindow):
                         if hasattr(widget, 'layout') and widget.layout():
                             buttons_layout = widget.layout()
                             if isinstance(buttons_layout, QGridLayout):
-                                # 清除布局
+                                # Clear layout
                                 while buttons_layout.count():
                                     child = buttons_layout.takeAt(0)
                                     if child.widget():
                                         child.widget().deleteLater()
                                 
-                                # 重新添加按鈕
+                                # Re-add buttons
                                 row = 0
                                 col = 0
                                 for name, info in self.programs[self.current_language].items():
@@ -685,7 +804,7 @@ class ControlPanel(QMainWindow):
                                     buttons_layout.addWidget(button, row, col)
                                     
                                     col += 1
-                                    if col >= 2:  # 每行兩個按鈕
+                                    if col >= 2:  # Two buttons per row
                                         col = 0
                                         row += 1
                                 break
@@ -693,7 +812,7 @@ class ControlPanel(QMainWindow):
 def main():
     app = QApplication(sys.argv)
     
-    # 設定應用程式屬性
+    # Set application properties
     app.setApplicationName("AirSim 控制面板")
     app.setApplicationVersion("1.0")
     
