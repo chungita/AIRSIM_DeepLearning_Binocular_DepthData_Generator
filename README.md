@@ -284,5 +284,5 @@ For more information about AirSim setup and usage, visit the [official AirSim do
 
 ---
 
-Mostly write with vibe coding, so there must be a lot of stupid writing.
+Mostly vibe coding, so there must be a lot of stupid writing.
 
