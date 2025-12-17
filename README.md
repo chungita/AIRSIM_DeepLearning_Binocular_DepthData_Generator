@@ -255,9 +255,7 @@ If you find this project helpful, please consider giving it a ⭐ on [GitHub](ht
 
 ## 👥 Authors
 
-- **chungita** - [GitHub Profile](https://github.com/chungita)
-- Dataset Generation and Processing Tools
-- AirSim Integration
+- **chungita** - [GitHub Profile](https://chungita.com/)
 
 ## 📧 Contact
 
