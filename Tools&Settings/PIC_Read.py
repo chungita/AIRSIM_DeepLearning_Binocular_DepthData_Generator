@@ -5,7 +5,7 @@ import numpy as np
 import cv2
 from PIL import Image
 from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, 
-                             QHBoxLayout, QLabel, QComboBox, QPushButton, QMessageBox)
+                             QHBoxLayout, QLabel, QComboBox, QPushButton, QMessageBox, QFileDialog)
 from PyQt5.QtCore import Qt, QTimer
 from PyQt5.QtGui import QPixmap, QImage
 import matplotlib.pyplot as plt
@@ -47,28 +47,53 @@ def read_pfm(file_path):
     """
     Reads a PFM file and returns the data and scale factor.
     """
-    with open(file_path, 'rb') as file:
-        header = file.readline().rstrip().decode('utf-8')
-        color = header == 'PF'
-        
-        temp_str = file.readline().rstrip().decode('utf-8')
-        dim_match = re.match(r'^(\d+)\s(\d+)\s*$', temp_str)
-        if not dim_match:
-            raise Exception('Malformed PFM header.')
-        width, height = map(int, dim_match.groups())
-        
-        scale = float(file.readline().rstrip().decode('utf-8'))
-        endian = '<' if scale < 0 else '>'
-        scale = abs(scale)
-        
-        data = np.fromfile(file, endian + 'f')
-        shape = (height, width, 3) if color else (height, width)
-        
-        if data.size != width * height * (3 if color else 1):
-            raise Exception('Inconsistent PFM data size.')
-        
-        data = np.reshape(data, shape)
-        return data, scale
+    try:
+        with open(file_path, 'rb') as file:
+            header = file.readline().rstrip().decode('utf-8')
+            color = header == 'PF'
+            
+            temp_str = file.readline().rstrip().decode('utf-8')
+            dim_match = re.match(r'^(\d+)\s(\d+)\s*$', temp_str)
+            if not dim_match:
+                raise Exception(f'Malformed PFM header in file: {os.path.basename(file_path)}')
+            width, height = map(int, dim_match.groups())
+            
+            scale = float(file.readline().rstrip().decode('utf-8'))
+            endian = '<' if scale < 0 else '>'
+            scale = abs(scale)
+            
+            # 獲取文件當前位置（頭部結束位置）
+            header_end = file.tell()
+            # 獲取文件總大小
+            file.seek(0, 2)  # 移動到文件末尾
+            file_size = file.tell()
+            file.seek(header_end)  # 回到數據開始位置
+            
+            # 計算預期的數據大小
+            expected_size = width * height * (3 if color else 1)
+            available_size = (file_size - header_end) // 4  # 每個 float 是 4 字節
+            
+            data = np.fromfile(file, endian + 'f')
+            shape = (height, width, 3) if color else (height, width)
+            
+            if data.size != expected_size:
+                error_msg = (
+                    f'Inconsistent PFM data size in file: {os.path.basename(file_path)}\n'
+                    f'Header declares: {width}x{height} ({expected_size} pixels)\n'
+                    f'Actual data size: {data.size} pixels\n'
+                    f'File size suggests: {available_size} pixels available\n'
+                    f'Possible causes: file corrupted, incomplete, or header information incorrect.'
+                )
+                raise Exception(error_msg)
+            
+            data = np.reshape(data, shape)
+            return data, scale
+    except Exception as e:
+        # 重新拋出異常，但包含文件名信息
+        if 'Inconsistent PFM data size' in str(e) or 'Malformed PFM header' in str(e):
+            raise e
+        else:
+            raise Exception(f'Error reading PFM file {os.path.basename(file_path)}: {str(e)}')
 
 def read_png(file_path):
     """
@@ -101,6 +126,9 @@ class ImageViewerWidget(QWidget):
         self.im = None
         self.current_data = None  # 儲存當前圖片數據用於鼠標追蹤
         self.current_language = os.environ.get('AIRSIM_LANGUAGE', 'zh')
+        
+        # 當前使用的資料夾路徑（不保存到設定）
+        self.current_folder = None
         
         # 從設定讀取可用的圖片類型
         self.available_types = self.get_available_image_types()
@@ -139,6 +167,7 @@ class ImageViewerWidget(QWidget):
         self.prev_btn.setText(self.texts[self.current_language]["prev_image"])
         self.next_btn.setText(self.texts[self.current_language]["next_image"])
         self.save_btn.setText(self.texts[self.current_language]["save_png"])
+        self.folder_btn.setText(self.texts[self.current_language]["change_folder"])
         self.type_switch_label.setText(self.texts[self.current_language]["type_switch"])
         self.pixel_value_label.setText(f"{self.texts[self.current_language]['pixel_value']} --")
         
@@ -164,6 +193,7 @@ class ImageViewerWidget(QWidget):
                 "no_files": "沒有檔案",
                 "pixel_value": "像素值:",
                 "save_png": "💾 下載 PNG",
+                "change_folder": "📁 更換資料夾",
                 "no_files_found": "沒有找到 {type} 檔案",
                 "error": "錯誤",
                 "folder_not_found": "找不到資料夾: {folder}",
@@ -182,6 +212,7 @@ class ImageViewerWidget(QWidget):
                 "no_files": "No Files",
                 "pixel_value": "Pixel Value:",
                 "save_png": "💾 Save PNG",
+                "change_folder": "📁 Change Folder",
                 "no_files_found": "No {type} files found",
                 "error": "Error",
                 "folder_not_found": "Folder not found: {folder}",
@@ -249,6 +280,26 @@ class ImageViewerWidget(QWidget):
         
         self.control_layout.addStretch()
         
+        # 添加更換資料夾按鈕（放在右側）
+        self.folder_btn = QPushButton(self.texts[self.current_language]["change_folder"])
+        self.folder_btn.clicked.connect(self.change_folder)
+        self.folder_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #3498db;
+                color: white;
+                font-weight: bold;
+                padding: 5px 10px;
+                border-radius: 3px;
+            }
+            QPushButton:hover {
+                background-color: #2980b9;
+            }
+            QPushButton:pressed {
+                background-color: #21618c;
+            }
+        """)
+        self.control_layout.addWidget(self.folder_btn)
+        
         # 將工具列添加到主布局，不設定拉伸因子（預設為0，固定大小）
         layout.addWidget(control_widget)
         
@@ -302,6 +353,14 @@ class ImageViewerWidget(QWidget):
         """
         當圖片類型改變時的回調函數
         """
+        # 如果使用自訂資料夾，不允許切換類型
+        if self.current_folder and os.path.exists(self.current_folder):
+            # 恢復原來的選擇
+            self.type_combo.blockSignals(True)
+            self.type_combo.setCurrentText(self.current_image_type)
+            self.type_combo.blockSignals(False)
+            return
+        
         self.current_image_type = image_type
         self.current_index = 0
         self.load_images()
@@ -314,6 +373,10 @@ class ImageViewerWidget(QWidget):
         切換圖片類型，保持當前序列號
         direction: 1 為下一個類型，-1 為上一個類型
         """
+        # 如果使用自訂資料夾，不允許切換類型
+        if self.current_folder and os.path.exists(self.current_folder):
+            return
+        
         if not self.available_types:
             return
             
@@ -342,13 +405,47 @@ class ImageViewerWidget(QWidget):
             
         self.update_display()
         
+    def change_folder(self):
+        """
+        打開資料夾選擇對話框，讓用戶選擇新的資料夾
+        """
+        # 獲取當前資料夾作為預設路徑
+        if self.current_folder and os.path.exists(self.current_folder):
+            default_folder = self.current_folder
+        else:
+            # 從設定讀取預設資料夾路徑
+            data_folder = self.settings.get('Pic_Input_folder', 'Results/Img')
+            default_folder = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", data_folder)
+            if not os.path.exists(default_folder):
+                default_folder = os.path.dirname(os.path.abspath(__file__))
+        
+        # 打開資料夾選擇對話框
+        folder = QFileDialog.getExistingDirectory(
+            self,
+            "選擇資料夾" if self.current_language == "zh" else "Select Folder",
+            default_folder
+        )
+        
+        if folder:
+            self.current_folder = folder
+            self.current_index = 0
+            # 禁用圖片類型選擇器
+            self.type_combo.setEnabled(False)
+            self.load_images()
+            self.update_display()
+    
     def load_images(self):
         """
         根據當前選擇的圖片類型載入圖片檔案
         """
-        # 從設定讀取資料夾路徑
-        data_folder = self.settings.get('Pic_Input_folder', 'Results/Img')
-        data_folder = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", data_folder)
+        # 如果已選擇自訂資料夾，使用它；否則從設定讀取
+        is_custom_folder = self.current_folder and os.path.exists(self.current_folder)
+        if is_custom_folder:
+            data_folder = self.current_folder
+        else:
+            # 從設定讀取資料夾路徑
+            data_folder = self.settings.get('Pic_Input_folder', 'Results/Img')
+            data_folder = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", data_folder)
         
         if not os.path.exists(data_folder):
             QMessageBox.warning(self, self.texts[self.current_language]["error"], 
@@ -361,44 +458,51 @@ class ImageViewerWidget(QWidget):
         except Exception as e:
             all_files = []
         
-        type_map = {
-            'disparity': {'prefix': 'Disparity_', 'ext': '.pfm'},
-            'depth':     {'prefix': 'DepthGT_',     'ext': '.pfm'},
-            'img0':      {'prefix': 'Img0_',      'ext': '.png'},
-            'img1':      {'prefix': 'Img1_',      'ext': '.png'},
-        }
-        
-        t = self.current_image_type.lower()
-        cfg = type_map.get(t, None)
-        if not cfg:
-            QMessageBox.warning(self, self.texts[self.current_language]["error"], 
-                              self.texts[self.current_language]["unknown_type"].format(type=self.current_image_type))
-            self.image_files = []
-            return
-        
-        prefix = cfg['prefix']
-        ext = cfg['ext']
-        
-        candidates = [f for f in all_files if f.lower().endswith(ext)]
-        
-        picked = []
-        
-        strict_match = [f for f in candidates if os.path.splitext(f)[0].lower().startswith(prefix.lower())]
-        
-        if not strict_match:
-            if t == 'depth':
-                depthgt_match = [f for f in candidates if 'depthgt' in f.lower()]
-                if depthgt_match:
-                    picked = depthgt_match
-                else:
-                    depth_match = [f for f in candidates if 'depth' in f.lower()]
-                    picked = depth_match
-            else:
-                picked = [f for f in candidates if t in f.lower()]
+        # 如果使用自訂資料夾，載入所有支援的圖片檔案（.pfm 和 .png）
+        if is_custom_folder:
+            supported_exts = ['.pfm', '.png']
+            picked = [f for f in all_files if os.path.splitext(f)[1].lower() in supported_exts]
+            self.image_files = [os.path.join(data_folder, f) for f in picked]
         else:
-            picked = strict_match
-        
-        self.image_files = [os.path.join(data_folder, f) for f in picked]
+            # 使用原本的邏輯，根據圖片類型過濾
+            type_map = {
+                'disparity': {'prefix': 'Disparity_', 'ext': '.pfm'},
+                'depth':     {'prefix': 'DepthGT_',     'ext': '.pfm'},
+                'img0':      {'prefix': 'Img0_',      'ext': '.png'},
+                'img1':      {'prefix': 'Img1_',      'ext': '.png'},
+            }
+            
+            t = self.current_image_type.lower()
+            cfg = type_map.get(t, None)
+            if not cfg:
+                QMessageBox.warning(self, self.texts[self.current_language]["error"], 
+                                  self.texts[self.current_language]["unknown_type"].format(type=self.current_image_type))
+                self.image_files = []
+                return
+            
+            prefix = cfg['prefix']
+            ext = cfg['ext']
+            
+            candidates = [f for f in all_files if f.lower().endswith(ext)]
+            
+            picked = []
+            
+            strict_match = [f for f in candidates if os.path.splitext(f)[0].lower().startswith(prefix.lower())]
+            
+            if not strict_match:
+                if t == 'depth':
+                    depthgt_match = [f for f in candidates if 'depthgt' in f.lower()]
+                    if depthgt_match:
+                        picked = depthgt_match
+                    else:
+                        depth_match = [f for f in candidates if 'depth' in f.lower()]
+                        picked = depth_match
+                else:
+                    picked = [f for f in candidates if t in f.lower()]
+            else:
+                picked = strict_match
+            
+            self.image_files = [os.path.join(data_folder, f) for f in picked]
         
         def natural_key(name):
             parts = re.split(r'(\d+)', os.path.basename(name))
@@ -456,38 +560,57 @@ class ImageViewerWidget(QWidget):
             if file_ext == '.pfm':
                 min_val, max_val = find_min_max_no_inf(data)
                 
-                if min_val is not None:
+                if min_val is not None and max_val is not None:
                     visual_max = max_val
+                    visual_min = min_val
+                    
                     if filename.lower().startswith("depth"):
                         visual_max = max_val if max_val is not None and max_val < 150 else 150
                         data[~np.isfinite(data)] = visual_max
+                        # 確保 visual_min 不會大於 visual_max
+                        visual_min = min(visual_min, visual_max - 1e-6) if visual_min < visual_max else 0
                         title = f'Depth - {filename} (範圍: {min_val:.3f} - {visual_max:.3f})'
                         cmap = 'jet'
                     elif filename.lower().startswith("disparity"):
                         data[~np.isfinite(data)] = 0
+                        # 對於視差圖，確保 visual_max 至少為 1，避免 vmin >= vmax
+                        if visual_max <= 0:
+                            visual_max = 1.0
+                        visual_min = min(visual_min, visual_max - 1e-6) if visual_min < visual_max else 0
                         title = f'Disparity - {filename} (範圍: {min_val:.3f} - {visual_max:.3f})'
                         cmap = 'jet'
                     else:
+                        # 確保 visual_min 不會大於 visual_max
+                        if visual_max <= visual_min:
+                            visual_max = visual_min + 1.0 if visual_min >= 0 else 1.0
+                            visual_min = visual_min if visual_min < visual_max else 0
                         title = f'{filename} (範圍: {min_val:.3f} - {visual_max:.3f})'
                         cmap = 'jet'
                 else:
+                    # 如果無法找到有效的最小/最大值，使用預設值
                     title = filename
                     cmap = 'jet'
+                    visual_min = 0.0
                     visual_max = 1.0
             elif file_ext == '.png':
                 title = f'{self.current_image_type} - {filename}'
                 if data.ndim == 3:
                     cmap = None
+                    visual_min = 0
                     visual_max = 255
                 else:
                     cmap = 'gray'
+                    visual_min = 0
                     visual_max = 255
             
             if cmap is None:
                 # 彩色圖片，不設定 vmin/vmax
                 self.im = self.ax.imshow(data)
             else:
-                self.im = self.ax.imshow(data, cmap=cmap, vmin=0, vmax=visual_max)
+                # 確保 vmin < vmax
+                if visual_min >= visual_max:
+                    visual_max = visual_min + 1.0
+                self.im = self.ax.imshow(data, cmap=cmap, vmin=visual_min, vmax=visual_max)
             
             # 設定標題和標籤
             self.ax.set_title(title, fontsize=12)
@@ -538,8 +661,6 @@ class ImageViewerWidget(QWidget):
             return
         
         try:
-            from PyQt5.QtWidgets import QFileDialog
-            
             # 獲取當前文件名（去除副檔名）
             current_file = self.image_files[self.current_index]
             base_name = os.path.splitext(os.path.basename(current_file))[0]
